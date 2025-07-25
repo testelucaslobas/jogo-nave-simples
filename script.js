@@ -1,8 +1,7 @@
-// Jogo de nave simples em JavaScript
-// O jogador controla uma nave na parte inferior da tela e deve disparar
-// projéteis para destruir inimigos que aparecem na parte superior.
-// Clique com o mouse para atirar. Com o passar do tempo, os inimigos
-// e os projéteis ficam mais rápidos.
+// Jogo de nave com seleção de naves e tiros personalizados
+// O jogador escolhe uma das quatro naves apresentadas na tela inicial.
+// Cada nave dispara projéteis com cores e tamanhos diferentes.
+// O inimigo é representado pela imagem 'inimigo.png'.
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -11,35 +10,57 @@ const ctx = canvas.getContext('2d');
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
-// Estado do jogo
+// Variáveis de estado
 let player;
 let bullets;
 let enemies;
 let score;
-let gameState = 'start'; // start, running, gameover
-
-// Partículas para explosões
+let gameState = 'start'; // 'start', 'running' ou 'gameover'
 let particles;
-// Estrelas de fundo para efeito de espaço
 let stars;
 
-// Configurações
-let bulletSpeed = 5; // velocidade inicial dos tiros
-let enemySpeed = 1; // velocidade inicial dos inimigos
-let spawnInterval = 1500; // intervalo inicial de spawn de inimigos em ms
+// Velocidades iniciais e controles de spawn
+let bulletSpeed = 5;
+let enemySpeed = 1;
+let spawnInterval = 1500;
 let lastSpawn = 0;
 
+// Índice da nave selecionada (0-3). O jogador escolhe na tela inicial.
+let selectedShipIndex = null;
+
+// Caminhos das imagens das naves e carregamento das imagens
+const shipPaths = ['images/nave1.png', 'images/nave2.png', 'images/nave3.png', 'images/nave4.png'];
+const shipImages = [];
+shipPaths.forEach((p) => {
+  const img = new Image();
+  img.src = p;
+  shipImages.push(img);
+});
+
+// Imagem do inimigo
+const enemyImage = new Image();
+enemyImage.src = 'images/inimigo.png';
+
+// Estilos de tiro para cada nave (cor, largura e altura).
+// Ajustados para combinar com as novas artes de nave enviadas pelo usuário.
+// A nave 1 (vermelha) dispara tiros avermelhados; a nave 2 (azul) dispara tiros azuis;
+// a nave 3 (amarela) dispara tiros dourados; a nave 4 (verde) dispara tiros esverdeados.
+const bulletStyles = [
+  { color: '#ff4c4c', w: 4, h: 10 }, // nave 1 – tiro vermelho
+  { color: '#2ecfff', w: 3, h: 12 }, // nave 2 – tiro azul-ciano
+  { color: '#ffd700', w: 5, h: 10 }, // nave 3 – tiro dourado
+  { color: '#32cd32', w: 6, h: 8 }   // nave 4 – tiro verde-lima
+];
+
+// Retângulos para clique na seleção de naves
+let shipSelectionRects = [];
+
 /**
- * Inicializa ou reinicia todas as estruturas do jogo.
- * Não inicia imediatamente o loop; isso é feito quando gameState muda para 'running'.
+ * Inicializa ou reinicia o jogo. Não inicia o loop de atualização; isso é feito
+ * quando o estado do jogo muda para 'running'.
  */
 function initGame() {
-  player = {
-    x: WIDTH / 2,
-    y: HEIGHT - 50,
-    width: 30,
-    height: 30
-  };
+  player = { x: WIDTH / 2, y: HEIGHT - 50, width: 40, height: 40 };
   bullets = [];
   enemies = [];
   particles = [];
@@ -53,7 +74,10 @@ function initGame() {
   createStars(60);
 }
 
-// Cria estrelas no fundo
+/**
+ * Cria estrelas para o fundo animado.
+ * @param {number} num – número de estrelas
+ */
 function createStars(num) {
   stars = [];
   for (let i = 0; i < num; i++) {
@@ -66,7 +90,7 @@ function createStars(num) {
   }
 }
 
-// Desenha estrelas
+/** Desenha as estrelas de fundo com transparência */
 function drawStars() {
   ctx.fillStyle = '#ffffff';
   stars.forEach((s) => {
@@ -76,7 +100,7 @@ function drawStars() {
   ctx.globalAlpha = 1;
 }
 
-// Atualiza estrelas
+/** Atualiza a posição das estrelas, criando um efeito de movimentação */
 function updateStars() {
   stars.forEach((s) => {
     s.y += s.speed;
@@ -87,36 +111,50 @@ function updateStars() {
   });
 }
 
-// Desenha a nave do jogador como um triângulo
+/** Desenha a nave do jogador. Se nenhuma nave estiver selecionada, não desenha nada. */
 function drawPlayer() {
-  ctx.fillStyle = '#00aaff';
-  ctx.beginPath();
-  ctx.moveTo(player.x, player.y - player.height / 2);
-  ctx.lineTo(player.x - player.width / 2, player.y + player.height / 2);
-  ctx.lineTo(player.x + player.width / 2, player.y + player.height / 2);
-  ctx.closePath();
-  ctx.fill();
+  if (selectedShipIndex === null) return;
+  const img = shipImages[selectedShipIndex];
+  if (img.complete) {
+    ctx.drawImage(img, player.x - player.width / 2, player.y - player.height / 2, player.width, player.height);
+  } else {
+    // Fallback para triângulo
+    ctx.fillStyle = '#00aaff';
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y - player.height / 2);
+    ctx.lineTo(player.x - player.width / 2, player.y + player.height / 2);
+    ctx.lineTo(player.x + player.width / 2, player.y + player.height / 2);
+    ctx.closePath();
+    ctx.fill();
+  }
 }
 
-// Desenha balas
+/** Desenha os tiros na tela usando as propriedades individuais de cada bala */
 function drawBullets() {
-  ctx.fillStyle = '#ffff00';
   bullets.forEach((b) => {
-    ctx.fillRect(b.x - 2, b.y - 10, 4, 10);
+    ctx.fillStyle = b.color || '#ffff00';
+    const w = b.width || 4;
+    const h = b.height || 10;
+    ctx.fillRect(b.x - w / 2, b.y - h, w, h);
   });
 }
 
-// Desenha inimigos como quadrados com borda
+/** Desenha os inimigos usando a imagem do inimigo. */
 function drawEnemies() {
   enemies.forEach((e) => {
-    ctx.fillStyle = '#ff3333';
-    ctx.fillRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
-    ctx.strokeStyle = '#aa0000';
-    ctx.strokeRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+    if (enemyImage.complete) {
+      ctx.drawImage(enemyImage, e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+    } else {
+      // Fallback para quadrado colorido
+      ctx.fillStyle = '#ff3333';
+      ctx.fillRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+      ctx.strokeStyle = '#aa0000';
+      ctx.strokeRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+    }
   });
 }
 
-// Cria partículas de explosão quando um inimigo é destruído
+/** Cria partículas para efeitos de explosão quando um inimigo é destruído */
 function createExplosion(x, y) {
   for (let i = 0; i < 10; i++) {
     const angle = Math.random() * Math.PI * 2;
@@ -131,7 +169,7 @@ function createExplosion(x, y) {
   }
 }
 
-// Atualiza partículas
+/** Atualiza a posição das partículas e remove as que já expiraram */
 function updateParticles() {
   particles.forEach((p) => {
     p.x += p.vx;
@@ -142,7 +180,7 @@ function updateParticles() {
   particles = particles.filter((p) => p.life > 0);
 }
 
-// Desenha partículas
+/** Desenha as partículas de explosão */
 function drawParticles() {
   particles.forEach((p) => {
     ctx.fillStyle = `rgba(255, 165, 0, ${p.life / 30})`;
@@ -150,36 +188,83 @@ function drawParticles() {
   });
 }
 
-// Atualizar posições e lógica
+/** Spawna um inimigo na parte superior da tela com posição aleatória */
+function spawnEnemy() {
+  const size = 40;
+  const x = Math.random() * (WIDTH - size) + size / 2;
+  enemies.push({ x, y: -size, size });
+}
+
+/** Desenha a tela inicial com a seleção de naves */
+function drawStartScreen() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillStyle = '#fff';
+  ctx.font = '24px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Escolha sua nave', WIDTH / 2, HEIGHT / 3);
+  // Desenha as quatro naves para seleção
+  const totalWidth = shipImages.length * 60 + (shipImages.length - 1) * 20;
+  let startX = (WIDTH - totalWidth) / 2;
+  const y = HEIGHT / 2;
+  shipSelectionRects = [];
+  for (let i = 0; i < shipImages.length; i++) {
+    const w = 60;
+    const h = 60;
+    const rect = { x: startX, y: y - h / 2, w, h, index: i };
+    shipSelectionRects.push(rect);
+    // Fundo levemente transparente para destacar a área
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.fillRect(rect.x - 2, rect.y - 2, w + 4, h + 4);
+    const img = shipImages[i];
+    if (img.complete) {
+      ctx.drawImage(img, rect.x, rect.y, w, h);
+    }
+    startX += w + 20;
+  }
+  ctx.font = '14px Arial';
+  ctx.fillStyle = '#ccc';
+  ctx.fillText('Clique em uma nave para começar', WIDTH / 2, y + 60);
+}
+
+/** Desenha a tela de Game Over */
+function drawGameOverScreen() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillStyle = '#fff';
+  ctx.font = '24px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Game Over', WIDTH / 2, HEIGHT / 2);
+  ctx.font = '16px Arial';
+  ctx.fillText('Clique para reiniciar', WIDTH / 2, HEIGHT / 2 + 30);
+}
+
+/** Atualiza a lógica do jogo e desenha todos os elementos na tela */
 function update(timestamp) {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  // Sempre desenha estrelas
+  // Atualiza e desenha fundo estelar
   updateStars();
   drawStars();
 
   if (gameState === 'start') {
-    // Tela de início
     drawStartScreen();
     window.requestAnimationFrame(update);
     return;
   }
   if (gameState === 'gameover') {
-    // Tela de game over
     drawGameOverScreen();
     window.requestAnimationFrame(update);
     return;
   }
 
-  // Somente se estiver rodando
-  // Spawn de inimigos em intervalos regulares
+  // Jogo rodando: spawn de inimigos em intervalos regulares
   if (timestamp - lastSpawn > spawnInterval) {
     spawnEnemy();
     lastSpawn = timestamp;
-    // Diminui o intervalo de spawn gradualmente até um limite mínimo
+    // Torna o jogo mais difícil progressivamente
     if (spawnInterval > 500) {
       spawnInterval -= 10;
     }
-    // Aumenta as velocidades de inimigos e balas aos poucos
     enemySpeed += 0.05;
     bulletSpeed += 0.03;
   }
@@ -195,23 +280,22 @@ function update(timestamp) {
     e.y += enemySpeed;
   });
 
-  // Checa colisões entre balas e inimigos
+  // Verifica colisões entre balas e inimigos
   bullets.forEach((b) => {
     enemies.forEach((e) => {
+      const bulletHeight = b.height || 10;
       if (
         b.x > e.x - e.size / 2 &&
         b.x < e.x + e.size / 2 &&
-        b.y - 10 < e.y + e.size / 2 &&
+        b.y - bulletHeight < e.y + e.size / 2 &&
         b.y > e.y - e.size / 2
       ) {
         e.hit = true;
         b.hit = true;
-        // cria explosão na posição do inimigo
         createExplosion(e.x, e.y);
       }
     });
   });
-
   // Remove balas e inimigos atingidos
   bullets = bullets.filter((b) => !b.hit);
   enemies = enemies.filter((e) => {
@@ -230,82 +314,74 @@ function update(timestamp) {
     }
   });
 
-  // Desenha tudo
+  // Desenha a nave, balas e inimigos
   drawPlayer();
   drawBullets();
   drawEnemies();
   updateParticles();
   drawParticles();
 
-  // Próximo frame
   window.requestAnimationFrame(update);
 }
 
-// Função para spawnar inimigos
-function spawnEnemy() {
-  const size = 30;
-  const x = Math.random() * (WIDTH - size) + size / 2;
-  enemies.push({ x, y: -size, size });
+/**
+ * Define o estado do jogo como game over
+ */
+function endGame() {
+  gameState = 'gameover';
 }
 
-// Desenha tela de início
-function drawStartScreen() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.fillStyle = '#fff';
-  ctx.font = '24px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('Clique para começar', WIDTH / 2, HEIGHT / 2);
-  ctx.font = '16px Arial';
-  ctx.fillText('Mova o mouse para controlar a nave e clique para atirar', WIDTH / 2, HEIGHT / 2 + 30);
-}
-
-// Desenha tela de game over
-function drawGameOverScreen() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.fillStyle = '#fff';
-  ctx.font = '24px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('Game Over', WIDTH / 2, HEIGHT / 2);
-  ctx.font = '16px Arial';
-  ctx.fillText('Clique para reiniciar', WIDTH / 2, HEIGHT / 2 + 30);
-}
-
-// Atira ao clicar ou inicia/reinicia jogo conforme estado
-canvas.addEventListener('click', () => {
+// Eventos de clique: seleção de nave, reinício ou disparo
+canvas.addEventListener('click', (event) => {
   if (gameState === 'start') {
-    // começa o jogo
-    gameState = 'running';
-    initGame();
-    window.requestAnimationFrame(update);
+    // Verifica se clicou em alguma nave
+    const rect = canvas.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const clickY = event.clientY - rect.top;
+    for (const r of shipSelectionRects) {
+      if (
+        clickX >= r.x &&
+        clickX <= r.x + r.w &&
+        clickY >= r.y &&
+        clickY <= r.y + r.h
+      ) {
+        selectedShipIndex = r.index;
+        gameState = 'running';
+        initGame();
+        window.requestAnimationFrame(update);
+        return;
+      }
+    }
     return;
   }
   if (gameState === 'gameover') {
-    // reinicia após fim do jogo
+    // Reinicia o jogo mantendo a nave selecionada
     gameState = 'running';
     initGame();
     window.requestAnimationFrame(update);
     return;
   }
   // Se estiver rodando, atira
-  bullets.push({ x: player.x, y: player.y - player.height / 2 });
+  if (selectedShipIndex !== null) {
+    const style = bulletStyles[selectedShipIndex] || { color: '#ffff00', w: 4, h: 10 };
+    bullets.push({
+      x: player.x,
+      y: player.y - player.height / 2,
+      color: style.color,
+      width: style.w,
+      height: style.h
+    });
+  }
 });
 
-// Mover a nave com o mouse (apenas eixo X)
+// Evento para mover a nave no eixo X com o mouse
 canvas.addEventListener('mousemove', (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
-  // Constrói a posição x para ficar dentro dos limites do canvas
   player.x = Math.max(player.width / 2, Math.min(WIDTH - player.width / 2, x));
 });
 
-// Função para finalizar o jogo
-function endGame() {
-  gameState = 'gameover';
-}
-
-// Quando a página carrega, exibe tela inicial
+// Inicia o jogo assim que a página carrega
 window.onload = () => {
   initGame();
   window.requestAnimationFrame(update);

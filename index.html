@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jogo de Nave Simples</title>
+  <style>
+    /* Estilos básicos para centralizar e colorir o jogo */
+    body {
+      margin: 0;
+      background-color: #000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+      font-family: Arial, sans-serif;
+    }
+
+    #gameContainer {
+      position: relative;
+    }
+
+    canvas {
+      background-color: #111;
+      border: 2px solid #444;
+      display: block;
+    }
+
+    #score {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      color: #fff;
+      font-size: 18px;
+      z-index: 1;
+    }
+
+    #gameOver {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-size: 32px;
+      display: none;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameContainer">
+    <div id="score">Pontuação: 0</div>
+    <div id="gameOver">Game Over! Clique para reiniciar.</div>
+    <canvas id="gameCanvas" width="480" height="640"></canvas>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

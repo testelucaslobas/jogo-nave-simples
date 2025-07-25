@@ -32,28 +32,22 @@
       top: 8px;
       left: 8px;
       color: #fff;
-      font-size: 18px;
+      font-size: 20px;
       z-index: 1;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 4px 8px;
+      border-radius: 4px;
     }
 
-    #gameOver {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #fff;
-      font-size: 32px;
-      display: none;
-      z-index: 1;
-    }
+    /* A tela de game over agora é desenhada via canvas; o estilo foi removido */
   </style>
 </head>
 <body>
-  <div id="gameContainer">
-    <div id="score">Pontuação: 0</div>
-    <div id="gameOver">Game Over! Clique para reiniciar.</div>
-    <canvas id="gameCanvas" width="480" height="640"></canvas>
-  </div>
+    <div id="gameContainer">
+      <div id="score">Pontuação: 0</div>
+      <!-- O elemento gameOver foi removido; a mensagem agora é desenhada via canvas -->
+      <canvas id="gameCanvas" width="480" height="640"></canvas>
+    </div>
 
   <script src="script.js"></script>
 </body>

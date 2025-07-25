@@ -16,7 +16,12 @@ let player;
 let bullets;
 let enemies;
 let score;
-let gameOver;
+let gameState = 'start'; // start, running, gameover
+
+// Partículas para explosões
+let particles;
+// Estrelas de fundo para efeito de espaço
+let stars;
 
 // Configurações
 let bulletSpeed = 5; // velocidade inicial dos tiros
@@ -24,55 +29,148 @@ let enemySpeed = 1; // velocidade inicial dos inimigos
 let spawnInterval = 1500; // intervalo inicial de spawn de inimigos em ms
 let lastSpawn = 0;
 
-// Função para iniciar ou reiniciar o jogo
-function startGame() {
+/**
+ * Inicializa ou reinicia todas as estruturas do jogo.
+ * Não inicia imediatamente o loop; isso é feito quando gameState muda para 'running'.
+ */
+function initGame() {
   player = {
     x: WIDTH / 2,
-    y: HEIGHT - 40,
-    width: 40,
-    height: 20
+    y: HEIGHT - 50,
+    width: 30,
+    height: 30
   };
   bullets = [];
   enemies = [];
+  particles = [];
+  stars = [];
   score = 0;
-  document.getElementById('score').textContent = `Pontuação: ${score}`;
-  document.getElementById('gameOver').style.display = 'none';
-  gameOver = false;
   bulletSpeed = 5;
   enemySpeed = 1;
   spawnInterval = 1500;
   lastSpawn = 0;
-  window.requestAnimationFrame(update);
+  document.getElementById('score').textContent = `Pontuação: ${score}`;
+  createStars(60);
 }
 
-// Função para desenhar a nave do jogador
+// Cria estrelas no fundo
+function createStars(num) {
+  stars = [];
+  for (let i = 0; i < num; i++) {
+    stars.push({
+      x: Math.random() * WIDTH,
+      y: Math.random() * HEIGHT,
+      size: Math.random() * 2 + 1,
+      speed: Math.random() * 0.5 + 0.2
+    });
+  }
+}
+
+// Desenha estrelas
+function drawStars() {
+  ctx.fillStyle = '#ffffff';
+  stars.forEach((s) => {
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(s.x, s.y, s.size, s.size);
+  });
+  ctx.globalAlpha = 1;
+}
+
+// Atualiza estrelas
+function updateStars() {
+  stars.forEach((s) => {
+    s.y += s.speed;
+    if (s.y > HEIGHT) {
+      s.y = -s.size;
+      s.x = Math.random() * WIDTH;
+    }
+  });
+}
+
+// Desenha a nave do jogador como um triângulo
 function drawPlayer() {
-  ctx.fillStyle = '#0bf';
-  ctx.fillRect(player.x - player.width / 2, player.y - player.height / 2, player.width, player.height);
+  ctx.fillStyle = '#00aaff';
+  ctx.beginPath();
+  ctx.moveTo(player.x, player.y - player.height / 2);
+  ctx.lineTo(player.x - player.width / 2, player.y + player.height / 2);
+  ctx.lineTo(player.x + player.width / 2, player.y + player.height / 2);
+  ctx.closePath();
+  ctx.fill();
 }
 
-// Função para desenhar balas
+// Desenha balas
 function drawBullets() {
-  ctx.fillStyle = '#ff0';
+  ctx.fillStyle = '#ffff00';
   bullets.forEach((b) => {
     ctx.fillRect(b.x - 2, b.y - 10, 4, 10);
   });
 }
 
-// Função para desenhar inimigos
+// Desenha inimigos como quadrados com borda
 function drawEnemies() {
-  ctx.fillStyle = '#f00';
   enemies.forEach((e) => {
+    ctx.fillStyle = '#ff3333';
     ctx.fillRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+    ctx.strokeStyle = '#aa0000';
+    ctx.strokeRect(e.x - e.size / 2, e.y - e.size / 2, e.size, e.size);
+  });
+}
+
+// Cria partículas de explosão quando um inimigo é destruído
+function createExplosion(x, y) {
+  for (let i = 0; i < 10; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 2 + 1;
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 30
+    });
+  }
+}
+
+// Atualiza partículas
+function updateParticles() {
+  particles.forEach((p) => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.05; // gravidade leve
+    p.life--;
+  });
+  particles = particles.filter((p) => p.life > 0);
+}
+
+// Desenha partículas
+function drawParticles() {
+  particles.forEach((p) => {
+    ctx.fillStyle = `rgba(255, 165, 0, ${p.life / 30})`;
+    ctx.fillRect(p.x, p.y, 3, 3);
   });
 }
 
 // Atualizar posições e lógica
 function update(timestamp) {
-  if (gameOver) return;
-
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
+  // Sempre desenha estrelas
+  updateStars();
+  drawStars();
 
+  if (gameState === 'start') {
+    // Tela de início
+    drawStartScreen();
+    window.requestAnimationFrame(update);
+    return;
+  }
+  if (gameState === 'gameover') {
+    // Tela de game over
+    drawGameOverScreen();
+    window.requestAnimationFrame(update);
+    return;
+  }
+
+  // Somente se estiver rodando
   // Spawn de inimigos em intervalos regulares
   if (timestamp - lastSpawn > spawnInterval) {
     spawnEnemy();
@@ -108,6 +206,8 @@ function update(timestamp) {
       ) {
         e.hit = true;
         b.hit = true;
+        // cria explosão na posição do inimigo
+        createExplosion(e.x, e.y);
       }
     });
   });
@@ -125,7 +225,7 @@ function update(timestamp) {
 
   // Verifica se algum inimigo alcançou a linha do jogador
   enemies.forEach((e) => {
-    if (e.y + e.size / 2 > player.y - player.height / 2) {
+    if (e.y + e.size / 2 > player.y + player.height / 2) {
       endGame();
     }
   });
@@ -134,6 +234,8 @@ function update(timestamp) {
   drawPlayer();
   drawBullets();
   drawEnemies();
+  updateParticles();
+  drawParticles();
 
   // Próximo frame
   window.requestAnimationFrame(update);
@@ -146,14 +248,47 @@ function spawnEnemy() {
   enemies.push({ x, y: -size, size });
 }
 
-// Atira ao clicar
+// Desenha tela de início
+function drawStartScreen() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillStyle = '#fff';
+  ctx.font = '24px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Clique para começar', WIDTH / 2, HEIGHT / 2);
+  ctx.font = '16px Arial';
+  ctx.fillText('Mova o mouse para controlar a nave e clique para atirar', WIDTH / 2, HEIGHT / 2 + 30);
+}
+
+// Desenha tela de game over
+function drawGameOverScreen() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
+  ctx.fillStyle = '#fff';
+  ctx.font = '24px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Game Over', WIDTH / 2, HEIGHT / 2);
+  ctx.font = '16px Arial';
+  ctx.fillText('Clique para reiniciar', WIDTH / 2, HEIGHT / 2 + 30);
+}
+
+// Atira ao clicar ou inicia/reinicia jogo conforme estado
 canvas.addEventListener('click', () => {
-  if (gameOver) {
-    // Reinicia se clicar após fim do jogo
-    startGame();
+  if (gameState === 'start') {
+    // começa o jogo
+    gameState = 'running';
+    initGame();
+    window.requestAnimationFrame(update);
     return;
   }
-  // Cria um novo projétil na posição atual da nave
+  if (gameState === 'gameover') {
+    // reinicia após fim do jogo
+    gameState = 'running';
+    initGame();
+    window.requestAnimationFrame(update);
+    return;
+  }
+  // Se estiver rodando, atira
   bullets.push({ x: player.x, y: player.y - player.height / 2 });
 });
 
@@ -167,11 +302,11 @@ canvas.addEventListener('mousemove', (e) => {
 
 // Função para finalizar o jogo
 function endGame() {
-  gameOver = true;
-  document.getElementById('gameOver').style.display = 'block';
+  gameState = 'gameover';
 }
 
-// Inicia o jogo quando a página carrega
+// Quando a página carrega, exibe tela inicial
 window.onload = () => {
-  startGame();
+  initGame();
+  window.requestAnimationFrame(update);
 };

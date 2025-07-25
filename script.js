@@ -29,7 +29,9 @@ let lastSpawn = 0;
 let selectedShipIndex = null;
 
 // Caminhos das imagens das naves e carregamento das imagens
-const shipPaths = ['images/nave1.png', 'images/nave2.png', 'images/nave3.png', 'images/nave4.png'];
+// Caminhos das imagens das naves. As imagens são servidas a partir do diretório raiz
+// do site no GitHub Pages, por isso os caminhos não incluem a pasta "images".
+const shipPaths = ['nave1.png', 'nave2.png', 'nave3.png', 'nave4.png'];
 const shipImages = [];
 shipPaths.forEach((p) => {
   const img = new Image();
@@ -39,7 +41,8 @@ shipPaths.forEach((p) => {
 
 // Imagem do inimigo
 const enemyImage = new Image();
-enemyImage.src = 'images/inimigo.png';
+// No GitHub Pages as imagens estão no diretório raiz; use caminho relativo simples.
+enemyImage.src = 'inimigo.png';
 
 // Estilos de tiro para cada nave (cor, largura e altura).
 // Ajustados para combinar com as novas artes de nave enviadas pelo usuário.
